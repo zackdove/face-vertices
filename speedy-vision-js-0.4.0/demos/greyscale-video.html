@@ -1,0 +1,100 @@
+<!--
+  speedy-vision.js
+  GPU-accelerated Computer Vision for JavaScript
+  Copyright 2020 Alexandre Martins <alemartf(at)gmail.com>
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  greyscale-video.html
+  Convert a video to greyscale
+-->
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="description" content="speedy-vision.js: GPU-accelerated Computer Vision for JavaScript">
+        <meta name="author" content="Alexandre Martins">
+        <title>Convert video to greyscale</title>
+        <script src="../dist/speedy-vision.js"></script>
+        <link href="style.css" rel="stylesheet">
+    </head>
+    <body>
+        <h1>Convert video to greyscale</h1>
+        <video
+            src="../assets/jelly.mp4"
+            poster="../assets/loading.jpg"
+            width="426" height="240"
+            preload="auto"
+            loop muted controls autoplay
+            title="Free video by Chris Munnik from https://www.pexels.com/pt-br/video/3297379/">
+        </video>
+        <script>
+window.onload = async function()
+{
+    // create a pipeline that converts a media to greyscale
+    const pipeline = Speedy.pipeline()
+                           .convertTo('greyscale');
+
+    // tell Speedy to load the video
+    const video = document.querySelector('video');
+    const media = await Speedy.load(video);
+
+    // create a canvas for rendering
+    const canvas = createCanvas(media.width, media.height, video.title);
+
+    // render the greyscale video
+    async function render()
+    {
+        const transformedMedia = await media.run(pipeline);
+        transformedMedia.draw(canvas);
+        renderStatus(canvas);
+        requestAnimationFrame(render);
+    }
+    render();
+}
+
+function createCanvas(width, height, title)
+{
+    const canvas = document.getElementById('canvas-demo') || document.createElement('canvas');
+
+    canvas.width = width;
+    canvas.height = height;
+    canvas.title = title;
+
+    if(!document.body.contains(canvas))
+        document.body.appendChild(canvas);
+
+    return canvas;
+}
+
+function renderStatus(canvas, color = 'white', size = 18)
+{
+    const context = canvas.getContext('2d');
+
+    context.font = `bold ${size}px sans-serif`;
+    context.fillStyle = color;
+    context.textBaseline = 'top';
+
+    context.shadowOffsetX = 2;
+    context.shadowOffsetY = 2;
+    context.shadowBlur = 2;
+    context.shadowColor = 'rgba(0, 0, 0, 0.5)';
+
+    context.fillText(`FPS: ${Speedy.fps}`, 8, 8);
+
+    context.shadowColor = 'rgba(0, 0, 0, 0)';
+}
+        </script>
+        <mark>Powered by <a href="https://github.com/alemart/speedy-vision-js">speedy-vision.js</a></mark>
+    </body>
+</html>

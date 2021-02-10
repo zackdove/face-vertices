@@ -1,0 +1,230 @@
+<!--
+  speedy-vision.js
+  GPU-accelerated Computer Vision for JavaScript
+  Copyright 2020 Alexandre Martins <alemartf(at)gmail.com>
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+  convolution.html
+  Convolution demo
+-->
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="description" content="speedy-vision.js: GPU-accelerated Computer Vision for JavaScript">
+        <meta name="author" content="Alexandre Martins">
+        <title>Cool effects with image convolutions</title>
+        <script src="../dist/speedy-vision.js"></script>
+        <link href="style.css" rel="stylesheet">
+    </head>
+    <body>
+        <h1>Image convolution</h1>
+        <form>
+            <div>
+                Select the
+                <select id="template"></select>
+                convolution kernel or edit the fields below:
+            </div>
+            <div class="separator"></div>
+            <div>
+                <table>
+                    <tr>
+                        <td><input type="text" id="kernel-0" value="0"></td>
+                        <td><input type="text" id="kernel-1" value="0"></td>
+                        <td><input type="text" id="kernel-2" value="0"></td>
+                    </tr>
+                    <tr>
+                        <td><input type="text" id="kernel-3" value="0"></td>
+                        <td><input type="text" id="kernel-4" value="1"></td>
+                        <td><input type="text" id="kernel-5" value="0"></td>
+                    </tr>
+                    <tr>
+                        <td><input type="text" id="kernel-6" value="0"></td>
+                        <td><input type="text" id="kernel-7" value="0"></td>
+                        <td><input type="text" id="kernel-8" value="0"></td>
+                    </tr>
+                </table>
+            </div>
+        </form>
+        <div>
+            <canvas id="canvas-demo"></canvas>
+        </div>
+        <div>
+            <button id="play">Play / pause</button>
+        </div>
+        <video
+            src="../assets/jelly.mp4"
+            poster="../assets/loading.jpg"
+            width="426" height="240"
+            preload="auto"
+            loop muted hidden
+            title="Free video by Chris Munnik from https://www.pexels.com/pt-br/video/3297379/">
+        </video>
+        <script>
+const template = {
+    "Original":
+    [
+        0, 0, 0,
+        0, 1, 0,
+        0, 0, 0,
+    ],
+
+    "Brighten":
+    [
+        0, 0, 0,
+        0, 2, 0,
+        0, 0, 0,
+    ],
+
+    "Blur":
+    [
+        0.11111, 0.11111, 0.11111,
+        0.11111, 0.11111, 0.11111,
+        0.11111, 0.11111, 0.11111,
+    ],
+
+    "Gaussian blur":
+    [
+        0.0625, 0.125, 0.0625,
+        0.125, 0.25, 0.125,
+        0.0625, 0.125, 0.0625,
+    ],
+
+    "Sharpen":
+    [
+         0,-1, 0,
+        -1, 5,-1,
+         0,-1, 0,
+    ],
+
+    "Emboss":
+    [
+        -2,-1, 0,
+        -1, 1, 1,
+         0, 1, 2
+    ],
+
+    "Edges":
+    [
+        1, 1, 1,
+        1,-8, 1,
+        1, 1, 1,
+    ],
+
+    "Horizontal lines":
+    [
+        -1,-1,-1,
+         2, 2, 2,
+        -1,-1,-1,
+    ],
+
+    "Vertical lines":
+    [
+        -1, 2,-1,
+        -1, 2,-1,
+        -1, 2,-1,
+    ],
+};
+
+window.onload = async function()
+{
+    // tell Speedy to load the video
+    const video = document.querySelector('video');
+    const media = await Speedy.load(video);
+    video.play();
+
+    // create a canvas to display the features
+    const canvas = createCanvas(media.width, media.height, video.title);
+
+    // setup the <select> element
+    const templateSelector = document.getElementById('template');
+    for(let templateName in template) {
+        const option = document.createElement('option');
+        const text = document.createTextNode(templateName);
+        option.value = templateName;
+        option.selected = (option.value == 'Original');
+        option.appendChild(text);
+        templateSelector.appendChild(option);
+    }
+    templateSelector.onchange = () => {
+        const name = templateSelector.value;
+        kernelElement.forEach((inputField, i) => inputField.value = template[name][i]);
+        updatePipeline();
+    };
+
+    // update the pipeline as soon as a text field is changed
+    const kernelElement = [...Array(9).keys()].map(k => document.getElementById('kernel-' + k));
+    for(let inputField of kernelElement)
+        inputField.oninput = updatePipeline;
+
+    // update the pipeline
+    let pipeline = Speedy.pipeline();
+    function updatePipeline()
+    {
+        const kernel = kernelElement.map(k => +k.value);
+        pipeline.release(); // cleanup memory
+        pipeline = Speedy.pipeline()
+                         .convolve(kernel);
+    }
+
+    // render video
+    async function render()
+    {
+        const transformedMedia = await media.run(pipeline);
+        transformedMedia.draw(canvas);
+        renderStatus(canvas);
+        requestAnimationFrame(render);
+    }
+    render();
+
+    // play/pause
+    const playButton = document.getElementById('play');
+    playButton.onclick = () => video.paused ? video.play() : video.pause();
+}
+
+function createCanvas(width, height, title)
+{
+    const canvas = document.getElementById('canvas-demo') || document.createElement('canvas');
+
+    canvas.width = width;
+    canvas.height = height;
+    canvas.title = title;
+
+    if(!document.body.contains(canvas))
+        document.body.appendChild(canvas);
+
+    return canvas;
+}
+
+function renderStatus(canvas, color = 'white', size = 18)
+{
+    const context = canvas.getContext('2d');
+
+    context.font = `bold ${size}px sans-serif`;
+    context.fillStyle = color;
+    context.textBaseline = 'top';
+
+    context.shadowOffsetX = 2;
+    context.shadowOffsetY = 2;
+    context.shadowBlur = 2;
+    context.shadowColor = 'rgba(0, 0, 0, 0.5)';
+
+    context.fillText(`FPS: ${Speedy.fps}`, 8, 8);
+
+    context.shadowColor = 'rgba(0, 0, 0, 0)';
+}
+        </script>
+        <mark>Powered by <a href="https://github.com/alemart/speedy-vision-js">speedy-vision.js</a></mark>
+    </body>
+</html>
