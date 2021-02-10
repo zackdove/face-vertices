@@ -1,6 +1,8 @@
 var vertices = [];
 var width;
 var height;
+var mediaXMult;
+var mediaYMult;
 
 class Vertex{
 	constructor(){
@@ -20,11 +22,10 @@ class Vertex{
 		for (vertex of vertices){
 			if (!(vertex === this)){
 				var dist = Math.sqrt(Math.pow((vertex.x-this.x),2) + Math.pow((vertex.y-this.y),2));
-				// console.log(dist);
 				if (dist < threshold){
 					stroke('rgba(255,255,255,0.5)');
 					strokeWeight(1);
-        			line(this.x,this.y,vertex.x,vertex.y);
+					line(this.x,this.y,vertex.x,vertex.y);
 				}
 			}
 		}
@@ -49,7 +50,6 @@ class Vertex{
 				}
 			}
 		} 
-		console.log(nearest);
 		for (var i = 0; i<nearest.length; i++){
 			stroke('rgba(255,255,255,0.5)');
 			strokeWeight(1);
@@ -57,13 +57,14 @@ class Vertex{
 		}
 	}
 	drawEdges(){
-		this.drawEdgesWithinX(200);
-		// this.drawNearestXEdges(3);
+		// this.drawEdgesWithinX(50);
+		this.drawNearestXEdges(2);
 	}
 }
 
 
 function setup(){
+	
 	width = window.innerWidth;
 	height = window.innerHeight;
 	createCanvas(width, height);
@@ -74,9 +75,49 @@ function setup(){
 
 function draw(){
 	background('#0f0f0f');
+	// pick a feature detector
 	for (vertex of vertices){
 		vertex.draw();
 		vertex.update();
 		vertex.drawEdges();
 	}
 }
+
+
+
+function getFeatures(features)
+{
+	
+}
+
+window.onload = async function(){
+	const media = await Speedy.camera();
+	mediaXMult = window.innerWidth/media.width;
+	mediaYMult = window.innerHeight/media.height;
+	const featureDetector = Speedy.FeatureDetector.FAST();
+	// set its sensitivity
+	featureDetector.sensitivity = 0.5;
+	// set enhancements
+	featureDetector.enhance({
+		illumination: 1
+	});
+	async function loop(){
+		const features = await featureDetector.detect(media);
+		vertices = [];
+		for(let feature of features) {
+			var vertex = new Vertex;
+			vertex.x = feature.x*mediaXMult;
+			vertex.y = feature.y*mediaYMult;
+			if (feature.scale>3){
+				vertex.radius = 15;
+			} else {
+				vertex.radius = feature.scale*5;
+			}
+			vertices.push(vertex);
+		}
+		requestAnimationFrame(loop);
+	}
+	loop();
+}
+
+
